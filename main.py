@@ -20,13 +20,13 @@ conn = sqlite3.connect('data.db')
 c = conn.cursor()
 # DB  Functions
 def create_usertable():
-	c.execute('CREATE TABLE IF NOT EXISTS userstable(username TEXT,password TEXT,accountno TEXT,balance INTEGER)')
+	c.execute('CREATE TABLE IF NOT EXISTS userstable(username TEXT,password TEXT,accountno TEXT,balance INTEGER,loanamount INTEGER,loantime TEXT,loanstatus TEXT)')
 
 
 def add_userdata(username,password):
 	#generate 10 len account number with mix of numbers and letters
 	acc_no= ''.join(np.random.choice(list(string.ascii_letters + string.digits),10))
-	c.execute('INSERT INTO userstable(username,password,accountno,balance) VALUES (?,?,?,?)',(username,password,acc_no,0))
+	c.execute('INSERT INTO userstable(username,password,accountno,balance,loanamount,loantime,loanstatus) VALUES (?,?,?,?,?,?,?)',(username,password,acc_no,0,0,"None","Not yet taken"))
 	conn.commit()
 
 def login_user(username,password):
@@ -69,6 +69,9 @@ def main():
 				st.success("Logged In as {}".format(username))
 				st.write("Account Number: {}".format(result[0][2]))
 				st.write("Balance: {}".format(result[0][3]))
+				st.write("Loan Amount: {}".format(result[0][4]))
+				st.write("Loan Time: {}".format(result[0][5]))
+				st.write("Loan Status: {}".format(result[0][6]))
 				# deposit and withdraw buttons
 				st.sidebar.subheader("Transaction")
 				if st.sidebar.checkbox("Deposit"):
@@ -106,6 +109,43 @@ def main():
 						c.execute('UPDATE userstable SET balance = balance + ? WHERE accountno = ?',(amount,account_number))
 						conn.commit()
 						st.success("Transfered {} to {}".format(amount,account_number))
+					else:
+						st.warning("Insufficient Balance")
+				# loan request
+				if st.sidebar.checkbox("Loan Request"):
+					loan_amount = st.sidebar.number_input("Loan Amount",min_value=0)
+					loan_time = st.sidebar.text_input("Loan Time")
+					c.execute('UPDATE userstable SET loanamount = ?,loantime = ?,loanstatus = ? WHERE username = ?',(loan_amount,loan_time,"Pending",username))
+					conn.commit()
+					st.success("Loan Requested")
+					c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
+					data = c.fetchall()
+					st.write("Loan Amount: {}".format(data[0][4]))
+					st.write("Loan Time: {}".format(data[0][5]))
+					st.write("Loan Status: {}".format(data[0][6]))
+				
+				# pay loan
+				if st.sidebar.checkbox("Pay Loan"):
+					loan_amount = st.sidebar.number_input("Loan Amount",min_value=0)
+					c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
+					data = c.fetchall()
+					pay_loan = data[0][4]
+					if data[0][3] >= loan_amount:
+						status = "None"
+						if pay_loan-loan_amount==0: status="Paid"
+						else: status="Pending"
+						c.execute('UPDATE userstable SET loanamount = ?,loanstatus = ? WHERE username = ?',(pay_loan-loan_amount,status,username))
+						conn.commit()
+						st.success("Loan Paid")
+						c.execute('UPDATE userstable SET balance = balance - ? WHERE username = ?',(loan_amount,username))
+						conn.commit()
+						c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
+						data = c.fetchall()
+						st.write("Loan Amount: {}".format(data[0][4]))
+						st.write("Loan Time: {}".format(data[0][5]))
+						st.write("Loan Status: {}".format(data[0][6]))
+					else:
+						st.warning("Insufficient Balance")
 				#print updated balance
 				
 			else:
@@ -128,7 +168,6 @@ def main():
 				st.warning("Passwords Don't match!")
 
 
-
-
 if __name__ == '__main__':
 	main()
+
