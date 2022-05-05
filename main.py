@@ -85,7 +85,6 @@ def view_all_users():
 	return data
 
 
-
 def main():
 	"""Erig Sicuro Bank"""
 
@@ -100,8 +99,8 @@ def main():
 			st.write("In progress ... ")
 	elif choice == "Login":
 		username = st.sidebar.text_input("User Name")
-		password = st.sidebar.text_input("Password",type='password')
-		if st.sidebar.checkbox("Login or sign out"):
+		password = st.sidebar.text_input("Password",type='password',value="password")
+		if st.sidebar.checkbox("Login or sign out") and password:
 			# if password == '12345':
 			create_usertable()
 			hashed_pswd = make_hashes(password)
@@ -145,8 +144,11 @@ def main():
 					c.execute('UPDATE personaltable SET address = ? WHERE username = ?',(new_Address,username))
 					conn.commit()
 					new_password = st.text_input("Enter the New Password : ")
-					c.execute('UPDATE userstable SET password = ? WHERE username = ?',(make_hashes(password),username))
-					conn.commit()
+					st.write(make_hashes(new_password))
+					#time.sleep(10)
+					if len(new_password)>0:
+						c.execute('UPDATE userstable SET password = ? WHERE username = ?',(make_hashes(new_password),username))
+						conn.commit()
 					# deposit and withdraw buttons
 					st.sidebar.subheader("Transaction")
 					if st.sidebar.checkbox("Deposit"):
@@ -227,6 +229,8 @@ def main():
 					
 				else:
 					st.warning("Incorrect Username/Password")
+		elif not password or not username:
+			st.error("Login Error")
 
 
 	elif choice == "SignUp":
