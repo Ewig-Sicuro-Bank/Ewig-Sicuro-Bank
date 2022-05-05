@@ -62,13 +62,15 @@ def check_hashes(password,hashed_text):
 def create_usertable():
 	c.execute('CREATE TABLE IF NOT EXISTS userstable(username TEXT,password TEXT,accountno TEXT,balance INTEGER,loanamount INTEGER,loantime TEXT,loanstatus TEXT)')
 	c.execute('CREATE TABLE IF NOT EXISTS transactionstable(username TEXT, transaction_amount INTEGER, transaction_type TEXT, transaction_time TEXT)')
-	c.execute('CREATE TABLE IF NOT EXISTS personaltable(username TEXT, address TEXT, dob TEXT)')
+	c.execute('CREATE TABLE IF NOT EXISTS personaltable(username TEXT, address TEXT, dob TEXT, name TEXT)')
 
 
 def add_userdata(username,password):
 	#generate 10 len account number with mix of numbers and letters
 	acc_no= ''.join(np.random.choice(list(string.ascii_letters + string.digits),10))
 	c.execute('INSERT INTO userstable(username,password,accountno,balance,loanamount,loantime,loanstatus) VALUES (?,?,?,?,?,?,?)',(username,password,acc_no,0,0,"None","Not yet taken"))
+	conn.commit()
+	c.execute('INSERT INTO personaltable VALUES(?,?,?,?)',(username,"","",username))
 	conn.commit()
 
 def login_user(username,password):
@@ -107,22 +109,44 @@ def main():
 				AdminControl()
 			else:
 				st.subheader("Profile")
-				result = login_user(username,check_hashes(password,hashed_pswd))
+				c.execute('SELECT password FROM userstable WHERE username = ?',(username,))
+				pass_or = c.fetchall()
+				st.write(make_hashes(password),pass_or[0][0])
+				result = login_user(username,check_hashes(password,pass_or[0][0]))
 				if result:
-					st.success("Logged In as {}".format(username))
+					#st.write((username))
+					c.execute('SELECT * FROM personaltable')# WHERE username = '+username)
+					dump = c.fetchall()
+					#st.write(dump)
+					for x in dump:
+						if x[0]==username:
+							personal_details = x
+					st.subheader("Personal Details")
+					st.write("Name : ",personal_details[3])
+					st.write("Date of Birth : ",personal_details[2])
+					st.write("Address : ",personal_details[1])
+					st.write("\n**********\n")
+					st.subheader("Account Details")
+					#st.write("Logged In as {}".format(username))
 					st.write("Account Number: {}".format(result[0][2]))
 					st.write("Balance: {}".format(result[0][3]))
 					st.write("Loan Amount: {}".format(result[0][4]))
 					st.write("Loan Time: {} Months".format(result[0][5]))
 					st.write("Loan Status: {}".format(result[0][6]))
-					if st.button("Edit Name"):
-						pass
-					if st.button("Edit D.O.B"):
-						pass
-					if st.button("Edit Address"):
-						pass
-					if st.button("Edit Password"):
-						pass
+					st.write("\n********\n")
+					#if st.button("Edit Name"):
+					new_name = st.text_input("Enter the Name : ",value=personal_details[3])
+					c.execute('UPDATE personaltable SET name = ? WHERE username = ?',(new_name,username))
+					conn.commit()
+					new_dob = st.text_input("Enter the D.O.B format(DD-MM-YYY)",value=personal_details[2])
+					c.execute('UPDATE personaltable SET dob = ? WHERE username = ?',(new_dob,username))
+					conn.commit()
+					new_Address = st.text_input("Enter the Address : ",value=personal_details[1])
+					c.execute('UPDATE personaltable SET address = ? WHERE username = ?',(new_Address,username))
+					conn.commit()
+					new_password = st.text_input("Enter the New Password : ")
+					c.execute('UPDATE userstable SET password = ? WHERE username = ?',(make_hashes(password),username))
+					conn.commit()
 					# deposit and withdraw buttons
 					st.sidebar.subheader("Transaction")
 					if st.sidebar.checkbox("Deposit"):
