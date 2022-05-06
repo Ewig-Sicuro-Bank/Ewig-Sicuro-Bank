@@ -63,7 +63,7 @@ def create_usertable():
 	c.execute('CREATE TABLE IF NOT EXISTS userstable(username TEXT,password TEXT,accountno TEXT,balance INTEGER,loanamount INTEGER,loantime TEXT,loanstatus TEXT)')
 	c.execute('CREATE TABLE IF NOT EXISTS transactionstable(username TEXT, transaction_amount INTEGER, transaction_type TEXT, transaction_time TEXT)')
 	c.execute('CREATE TABLE IF NOT EXISTS personaltable(username TEXT, address TEXT, dob TEXT, name TEXT)')
-
+	c.execute('CREATE TABLE IF NOT EXISTS aadhartable(username TEXT, aadhar INTEGER)')
 
 def add_userdata(username,password):
 	#generate 10 len account number with mix of numbers and letters
@@ -71,6 +71,7 @@ def add_userdata(username,password):
 	c.execute('INSERT INTO userstable(username,password,accountno,balance,loanamount,loantime,loanstatus) VALUES (?,?,?,?,?,?,?)',(username,password,acc_no,0,0,"None","Not yet taken"))
 	conn.commit()
 	c.execute('INSERT INTO personaltable VALUES(?,?,?,?)',(username,"","",username))
+	c.execute('INSERT INTO aadhartable VALUES(?,?)',(username,0))
 	conn.commit()
 
 def login_user(username,password):
@@ -110,13 +111,15 @@ def main():
 				st.subheader("Profile")
 				c.execute('SELECT password FROM userstable WHERE username = ?',(username,))
 				pass_or = c.fetchall()
-				st.write(make_hashes(password),pass_or[0][0])
+				#st.write(make_hashes(password),pass_or[0][0])
 				result = login_user(username,check_hashes(password,pass_or[0][0]))
 				if result:
 					#st.write((username))
 					c.execute('SELECT * FROM personaltable')# WHERE username = '+username)
 					dump = c.fetchall()
-					#st.write(dump)
+					c.execute('SELECT * FROM aadhartable WHERE username = ?',(username,))
+					aadhar_data = c.fetchall()
+					#st.write(aadhar_data)
 					for x in dump:
 						if x[0]==username:
 							personal_details = x
@@ -124,31 +127,44 @@ def main():
 					st.write("Name : ",personal_details[3])
 					st.write("Date of Birth : ",personal_details[2])
 					st.write("Address : ",personal_details[1])
+					if aadhar_data[0][1]!=0:
+						st.write("KYC Status: Confirmed")
+						st.write("Aadhar Number : ",aadhar_data[0][1])
+					else:
+						st.write("Aadhar Status : Pending")
 					st.write("\n**********\n")
 					st.subheader("Account Details")
 					#st.write("Logged In as {}".format(username))
 					st.write("Account Number: {}".format(result[0][2]))
 					st.write("Balance: {}".format(result[0][3]))
-					st.write("Loan Amount: {}".format(result[0][4]))
-					st.write("Loan Time: {} Months".format(result[0][5]))
-					st.write("Loan Status: {}".format(result[0][6]))
+					if result[0][3]!=0:
+						st.write("Loan Amount: {}".format(result[0][4]))
+						st.write("Loan Time: {} Months".format(result[0][5]))
+						st.write("Loan Status: {}".format(result[0][6]))
+					st.write("\n\n")
+					if st.button("More Details . ."):
+						st.write("Under Construction")
 					st.write("\n********\n")
 					#if st.button("Edit Name"):
 					new_name = st.text_input("Enter the Name : ",value=personal_details[3])
-					c.execute('UPDATE personaltable SET name = ? WHERE username = ?',(new_name,username))
-					conn.commit()
+					
 					new_dob = st.text_input("Enter the D.O.B format(DD-MM-YYY)",value=personal_details[2])
-					c.execute('UPDATE personaltable SET dob = ? WHERE username = ?',(new_dob,username))
-					conn.commit()
+					
 					new_Address = st.text_input("Enter the Address : ",value=personal_details[1])
-					c.execute('UPDATE personaltable SET address = ? WHERE username = ?',(new_Address,username))
-					conn.commit()
 					new_password = st.text_input("Enter the New Password : ")
-					st.write(make_hashes(new_password))
-					#time.sleep(10)
-					if len(new_password)>0:
-						c.execute('UPDATE userstable SET password = ? WHERE username = ?',(make_hashes(new_password),username))
+					#st.write(make_hashes(new_password))
+					aadhar_number = st.number_input("Enter your Aadhar Number as  proof for these changes",min_value=0,value=0)
+					if aadhar_number!=0:
+						c.execute('UPDATE aadhartable SET aadhar = ? WHERE username = ?',(aadhar_number,username))
+						c.execute('UPDATE personaltable SET name = ? WHERE username = ?',(new_name,username))
+						c.execute('UPDATE personaltable SET dob = ? WHERE username = ?',(new_dob,username))
+						c.execute('UPDATE personaltable SET address = ? WHERE username = ?',(new_Address,username))
+						#time.sleep(10)
+						if len(new_password)>0:
+							c.execute('UPDATE userstable SET password = ? WHERE username = ?',(make_hashes(new_password),username))
 						conn.commit()
+					else:
+						st.warning("User details won't be saved without entering the Aadhar Number !")
 					# deposit and withdraw buttons
 					st.sidebar.subheader("Transaction")
 					if st.sidebar.checkbox("Deposit"):
