@@ -1,17 +1,32 @@
 import streamlit as st
-def RetrieveNotifications(username, c):
-    c.execute('SELECT notifications FROM notificationtable WHERE username = ?',(username,))
+import time
+def RetrieveNotifications(username, c,conn):
+    c.execute('SELECT notifications,status,time FROM notificationtable WHERE username = ?',(username,))
     notifications = c.fetchall()
     #st.write(notifications)
     if len(notifications)==0:
-        return ["No notifications yet . .",]
+        st.success("No notifications yet . .")
     else:
-        return notifications
+        count=0
+        for i in notifications:
+            cols = st.columns(2)
+            if i[1]=="Unread":
+                cols[0].success(i[0])
+                if cols[1].checkbox("Mark Message "+str(count+1)+" as Read"):
+                    c.execute("UPDATE notificationtable SET status = ? WHERE time = ? AND username = ?",("Read",i[2],username))
+                    conn.commit()
+
+            else:
+                cols[0].warning(i[0])
+                if cols[1].checkbox("Mark Message "+str(count+1)+" as Unread"):
+                   c.execute("UPDATE notificationtable SET status = ? WHERE time = ? AND username = ?",("Unread",i[2],username))
+                   conn.commit() 
+            count+=1
 
 def InsertNotifications(username, c, notification, conn):
     if len(notification)==0:
         return
-    c.execute('INSERT INTO notificationtable VALUES(?,?,?)',(username,notification,"Unread"))
+    c.execute('INSERT INTO notificationtable VALUES(?,?,?,?)',(username,notification,"Unread",str(time.time())))
     conn.commit()
 
 def DeleteNotification(username,c,notification,conn):

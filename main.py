@@ -43,7 +43,7 @@ def create_usertable():
 	c.execute('CREATE TABLE IF NOT EXISTS personaltable(username TEXT, address TEXT, dob TEXT, name TEXT)')
 	c.execute('CREATE TABLE IF NOT EXISTS aadhartable(username TEXT, aadhar INTEGER)')
 	c.execute('CREATE TABLE IF NOT EXISTS exchangetable(username TEXT,USD TEXT, EURO TEXT, JPY TEXT)')
-	c.execute('CREATE TABLE IF NOT EXISTS notificationtable(username TEXT, notifications TEXT, status TEXT)')
+	c.execute('CREATE TABLE IF NOT EXISTS notificationtable(username TEXT, notifications TEXT, status TEXT,time TEXT)')
 
 def add_userdata(username,password):
 	#generate 10 len account number with mix of numbers and letters
@@ -93,10 +93,10 @@ def main():
 				col = st.columns(2)
 				if col[0].checkbox("Notifications"):
 					
-					data = alerts.RetrieveNotifications(username,c)
-					if len(data[0])!=0:
-						for i in data:
-							st.success(i[0])
+					alerts.RetrieveNotifications(username,c,conn)
+					#if len(data[0])!=0:
+					#	for i in data:
+					#		st.success(i[0])
 
 				c.execute('SELECT password FROM userstable WHERE username = ?',(username,))
 				pass_or = c.fetchall()
@@ -155,98 +155,104 @@ def main():
 					else:
 						st.warning("User details won't be saved without entering the Aadhar Number !")
 					# deposit and withdraw buttons
-					st.sidebar.subheader("Transaction")
-					if st.sidebar.checkbox("Deposit"):
-						amount = st.sidebar.number_input("Amount",min_value=0)
-						c.execute('UPDATE userstable SET balance = balance + ? WHERE username = ?',(amount,username))
-						conn.commit()
-						st.success("Deposited {}".format(amount))
-						c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,amount,"CREDIT",str(time.ctime())))
-						conn.commit()
-						c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
-						data = c.fetchall()
-						alerts.InsertNotifications(username,c,"Amount of "+str(amount)+" Has been credited to your account.",conn)
-						st.write("Balance: {}".format(data[0][3]))
-					if st.sidebar.checkbox("Withdraw"):
-						amount = st.sidebar.number_input("Amount",min_value=0)
-						# check wether sufficient balance is there or not
-						c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
-						data = c.fetchall()
-						if data[0][3] >= amount:
-							c.execute('UPDATE userstable SET balance = balance - ? WHERE username = ?',(amount,username))
-							conn.commit()
-							alerts.InsertNotifications(username,c,"Amount of "+str(amount)+" Has been debited from your account.",conn)
-							c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,amount,"DEBIT",str(time.ctime())))
-							conn.commit()
-							st.success("Withdraw {}".format(amount))
+					st.sidebar.subheader("Menu")
+					option = st.sidebar.radio(" ",("Transactions","Loans","Exchange"))
+					if option=="Transactions":
+						if st.sidebar.checkbox("Deposit"):
+							amount = st.sidebar.number_input("Amount",min_value=0)
+							if amount>0:
+								c.execute('UPDATE userstable SET balance = balance + ? WHERE username = ?',(amount,username))
+								conn.commit()
+								st.success("Deposited {}".format(amount))
+								c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,amount,"CREDIT",str(time.ctime())))
+								conn.commit()
+								c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
+								data = c.fetchall()
+								alerts.InsertNotifications(username,c,"Amount of "+str(amount)+" Has been credited to your account.",conn)
+							st.write("Balance: {}".format(data[0][3]))
+						if st.sidebar.checkbox("Withdraw"):
+							amount = st.sidebar.number_input("Amount",min_value=0)
+							# check wether sufficient balance is there or not
 							c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
 							data = c.fetchall()
-							st.write("Balance: {}".format(data[0][3]))
-						else:
-							st.warning("Insufficient Balance")
-					# transfer money to other user
-					if st.sidebar.checkbox("Transfer"):
-						account_number = st.sidebar.text_input("Account Number")
-						amount = st.sidebar.number_input("Amount",min_value=0)
-						# check wether sufficient balance is there or not
-						c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
-						data = c.fetchall()
-						if data[0][3] >= amount:
-							c.execute('UPDATE userstable SET balance = balance - ? WHERE username = ?',(amount,username))
-							conn.commit()
-							c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,amount,"DEBIT",str(time.ctime())))
-							conn.commit()
-							c.execute('UPDATE userstable SET balance = balance + ? WHERE accountno = ?',(amount,account_number))
-							conn.commit()
-							c.execute('SELECT username FROM userstable WHERE accountno = ?',(account_number,))
-							second_username = c.fetchall()
-							c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,amount,"DEBIT",str(time.ctime())))
-							conn.commit()
-							alerts.InsertNotifications(second_username,c,"Amount of "+str(amount)+" Has been credited to your account.",conn)
-							alerts.InsertNotifications(username,c,"Amount of "+str(amount)+" Has been debited from your account.",conn)
-							st.success("Transfered {} to {}".format(amount,account_number))
-						else:
-							st.warning("Insufficient Balance")
+							if data[0][3] >= amount:
+								if amount > 0:
+									c.execute('UPDATE userstable SET balance = balance - ? WHERE username = ?',(amount,username))
+									conn.commit()
+									alerts.InsertNotifications(username,c,"Amount of "+str(amount)+" Has been debited from your account.",conn)
+									c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,amount,"DEBIT",str(time.ctime())))
+									conn.commit()
+									st.success("Withdraw {}".format(amount))
+									c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
+									data = c.fetchall()
+								st.write("Balance: {}".format(data[0][3]))
+							else:
+								st.warning("Insufficient Balance")
+						# transfer money to other user
+						if st.sidebar.checkbox("Transfer"):
+							account_number = st.sidebar.text_input("Account Number")
+							amount = st.sidebar.number_input("Amount",min_value=0)
+							# check wether sufficient balance is there or not
+							c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
+							data = c.fetchall()
+							if data[0][3] >= amount and amount > 0:
+								c.execute('UPDATE userstable SET balance = balance - ? WHERE username = ?',(amount,username))
+								conn.commit()
+								c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,amount,"DEBIT",str(time.ctime())))
+								conn.commit()
+								c.execute('UPDATE userstable SET balance = balance + ? WHERE accountno = ?',(amount,account_number))
+								conn.commit()
+								c.execute('SELECT username FROM userstable WHERE accountno = ?',(account_number,))
+								second_username = c.fetchall()
+								c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,amount,"DEBIT",str(time.ctime())))
+								conn.commit()
+								alerts.InsertNotifications(second_username,c,"Amount of "+str(amount)+" Has been credited to your account.",conn)
+								alerts.InsertNotifications(username,c,"Amount of "+str(amount)+" Has been debited from your account.",conn)
+								st.success("Transfered {} to {}".format(amount,account_number))
+							else:
+								st.warning("Transaction Error . .")
 					# loan request
-					if st.sidebar.checkbox("Loan Request"):
-						loan_amount = st.sidebar.number_input("Loan Amount",min_value=0)
-						loan_time = st.sidebar.text_input("Loan Time",value="6")
-						c.execute('UPDATE userstable SET loanamount = ?,loantime = ?,loanstatus = ? WHERE username = ?',(loan_amount,loan_time,"Pending",username))
-						conn.commit()
-						c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,loan_amount,"CREDIT",str(time.ctime())))
-						conn.commit()
-						alerts.InsertNotifications(username,c,"Amount of "+str(loan_amount)+" Has been credited to your account.",conn)
-						st.success("Loan Requested")
-						c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
-						data = c.fetchall()
-						st.write("Loan Amount: {}".format(data[0][4]))
-						st.write("Loan Time: {}".format(data[0][5]))
-						st.write("Loan Status: {}".format(data[0][6]))
-					
-					# pay loan
-					if st.sidebar.checkbox("Pay Loan"):
-						loan_amount = st.sidebar.number_input("Loan Amount",min_value=0)
-						c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
-						data = c.fetchall()
-						pay_loan = data[0][4]
-						if data[0][3] >= loan_amount:
-							status = "None"
-							if pay_loan-loan_amount==0: status="Paid"
-							else: status="Pending"
-							c.execute('UPDATE userstable SET loanamount = ?,loanstatus = ? WHERE username = ?',(pay_loan-loan_amount,status,username))
-							conn.commit()
-							st.success("Loan Paid")
-							c.execute('UPDATE userstable SET balance = balance - ? WHERE username = ?',(loan_amount,username))
-							conn.commit()
-							c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,loan_amount,"CREDIT",str(time.ctime())))
-							conn.commit()
-							alerts.InsertNotifications(username,c,"Amount of "+str(loan_amount)+" Has been debited from your account.",conn)
+					if option=="Loans":
+						if st.sidebar.checkbox("Loan Request"):
+							loan_amount = st.sidebar.number_input("Loan Amount",min_value=0)
+							loan_time = st.sidebar.text_input("Loan Time",value="6")
+							if loan_amount > 0:
+								c.execute('UPDATE userstable SET loanamount = ?,loantime = ?,loanstatus = ? WHERE username = ?',(loan_amount,loan_time,"Pending",username))
+								conn.commit()
+								c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,loan_amount,"CREDIT",str(time.ctime())))
+								conn.commit()
+								alerts.InsertNotifications(username,c,"Amount of "+str(loan_amount)+" Has been credited to your account.",conn)
+								st.success("Loan Requested")
 							c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
 							data = c.fetchall()
 							st.write("Loan Amount: {}".format(data[0][4]))
 							st.write("Loan Time: {}".format(data[0][5]))
 							st.write("Loan Status: {}".format(data[0][6]))
-					if st.sidebar.checkbox("Money Exchange"):
+						
+						# pay loan
+						if st.sidebar.checkbox("Pay Loan"):
+							loan_amount = st.sidebar.number_input("Loan Amount",min_value=0)
+							c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
+							data = c.fetchall()
+							pay_loan = data[0][4]
+							if data[0][3] >= loan_amount and loan_amount > 0:
+								status = "None"
+								if pay_loan-loan_amount==0: status="Paid"
+								else: status="Pending"
+								c.execute('UPDATE userstable SET loanamount = ?,loanstatus = ? WHERE username = ?',(pay_loan-loan_amount,status,username))
+								conn.commit()
+								st.success("Loan Paid")
+								c.execute('UPDATE userstable SET balance = balance - ? WHERE username = ?',(loan_amount,username))
+								conn.commit()
+								c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,loan_amount,"CREDIT",str(time.ctime())))
+								conn.commit()
+								alerts.InsertNotifications(username,c,"Amount of "+str(loan_amount)+" Has been debited from your account.",conn)
+								c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
+								data = c.fetchall()
+								st.write("Loan Amount: {}".format(data[0][4]))
+								st.write("Loan Time: {}".format(data[0][5]))
+								st.write("Loan Status: {}".format(data[0][6]))
+					if option=="Exchange":
 						st.sidebar.header("Currencies")
 						st.sidebar.warning("Under Construction . .")
 						if st.sidebar.button("INR->USD"):
