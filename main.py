@@ -1,5 +1,6 @@
 from curses import keyname
 from faulthandler import disable
+from re import A
 import string
 from tkinter import DISABLED
 from turtle import position
@@ -155,11 +156,14 @@ def main():
 					else:
 						st.warning("User details won't be saved without entering the Aadhar Number !")
 					# deposit and withdraw buttons
-					st.sidebar.subheader("Menu")
+					st.sidebar.header("Menu")
 					option = st.sidebar.radio(" ",("Transactions","Loans","Exchange"))
 					if option=="Transactions":
+						st.sidebar.header("Transaction Options")
 						if st.sidebar.checkbox("Deposit"):
 							amount = st.sidebar.number_input("Amount",min_value=0)
+							c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
+							data = c.fetchall()
 							if amount>0:
 								c.execute('UPDATE userstable SET balance = balance + ? WHERE username = ?',(amount,username))
 								conn.commit()
@@ -213,6 +217,7 @@ def main():
 								st.warning("Transaction Error . .")
 					# loan request
 					if option=="Loans":
+						st.sidebar.header("Loan Options")
 						if st.sidebar.checkbox("Loan Request"):
 							loan_amount = st.sidebar.number_input("Loan Amount",min_value=0)
 							loan_time = st.sidebar.text_input("Loan Time",value="6")
@@ -276,24 +281,24 @@ def main():
 					
 				else:
 					st.warning("Incorrect Username/Password")
-		elif not password or not username:
+		elif not password or not username :
 			st.error("Login Error")
 
 
 	elif choice == "SignUp":
-			st.subheader("Create New Account")
-			new_user = st.text_input("Create  Username")
-			new_password = st.text_input("Enter Password",type='password')
-			again_password = st.text_input("Re enter the password",type='password')
+			st.sidebar.subheader("Create New Account")
+			new_user = st.sidebar.text_input("Create  Username")
+			new_password = st.sidebar.text_input("Enter Password",type='password')
+			again_password = st.sidebar.text_input("Re enter the password",type='password')
 			
 			if again_password == new_password:
-				if st.button("Signup"):
+				if st.sidebar.button("Signup"):
 					create_usertable()
 					add_userdata(new_user,make_hashes(new_password))
-					st.success("You have successfully created a valid Account")
-					st.info("Go to Login Menu to login")
+					st.sidebar.success("You have successfully created a valid Account")
+					st.sidebar.info("Go to Login Menu to login")
 			else:
-				st.warning("Passwords Don't match!")
+				st.sidebar.warning("Passwords Don't match!")
 
 
 if __name__ == '__main__':
