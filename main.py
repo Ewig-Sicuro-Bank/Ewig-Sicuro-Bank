@@ -1,11 +1,19 @@
+from curses import keyname
+from faulthandler import disable
 import string
+from tkinter import DISABLED
 from turtle import position
 from certifi import where
 import streamlit as st
 import pandas as pd
 import numpy as np
 import time
-
+import Modules.AlertNotification as alerts
+import Modules.Admin as Admin
+MONTH_TIME = 60*60*24*30
+USD = 0.013
+JPY = 1.673
+EURO = 0.012
 
 # Security
 import hashlib
@@ -21,37 +29,7 @@ c = conn.cursor()
 ADMIN_USERNAME = "ewigsicuro"
 ADMIN_PASSWORD = hashlib.sha256(str.encode("admin")).hexdigest()
 
-def AdminControl():
-	st.header("Admin Page")
-	c.execute('SELECT * FROM userstable')
-	admin_data = c.fetchall()
-	c.execute('SELECT * FROM transactionstable')
-	transaction_data = c.fetchall()
-	#st.write(admin_data)
-	for i in range(len(admin_data)):
-		transac = []
-		for x in transaction_data:
-			if x[0]==admin_data[i][0]:
-				transac.append(x)
-		st.write("")
-		st.subheader("Account Details")
-		st.write("Username : ",admin_data[i][0])
-		st.write("Account No. : ",admin_data[i][2])
-		st.write("Account Balance : ",admin_data[i][3])
-		if admin_data[i][4]!=0:
-			st.write("Loan Amount Pending : ",admin_data[i][4])
-			st.write("Loan Time : ",admin_data[i][5]," Months")
-		else:
-			st.write("Loan Status : ",admin_data[i][6])
-		st.write("")
-		st.subheader("Transactions : \n\n")
-		for x in transac:
-			st.write("Transaction Amount : ",x[1])
-			st.write("Transaction Type : ",x[2])
-			st.write("Transaction Time : ",x[3])
-			st.write("\n\n#-#-#-\n\n")
-		
-		st.write("\n*************\n")
+
 
 def check_hashes(password,hashed_text):
 	if make_hashes(password) == hashed_text:
@@ -64,6 +42,8 @@ def create_usertable():
 	c.execute('CREATE TABLE IF NOT EXISTS transactionstable(username TEXT, transaction_amount INTEGER, transaction_type TEXT, transaction_time TEXT)')
 	c.execute('CREATE TABLE IF NOT EXISTS personaltable(username TEXT, address TEXT, dob TEXT, name TEXT)')
 	c.execute('CREATE TABLE IF NOT EXISTS aadhartable(username TEXT, aadhar INTEGER)')
+	c.execute('CREATE TABLE IF NOT EXISTS exchangetable(username TEXT,USD TEXT, EURO TEXT, JPY TEXT)')
+	c.execute('CREATE TABLE IF NOT EXISTS notificationtable(username TEXT, notifications TEXT, status TEXT)')
 
 def add_userdata(username,password):
 	#generate 10 len account number with mix of numbers and letters
@@ -72,6 +52,7 @@ def add_userdata(username,password):
 	conn.commit()
 	c.execute('INSERT INTO personaltable VALUES(?,?,?,?)',(username,"","",username))
 	c.execute('INSERT INTO aadhartable VALUES(?,?)',(username,0))
+	alerts.InsertNotifications(username,c,"Hello "+username+", Welcome to Ewig Sicuro Bank.",conn)
 	conn.commit()
 
 def login_user(username,password):
@@ -106,9 +87,17 @@ def main():
 			create_usertable()
 			hashed_pswd = make_hashes(password)
 			if username == ADMIN_USERNAME and hashed_pswd == ADMIN_PASSWORD:
-				AdminControl()
+				Admin.AdminControl(c,conn)
 			else:
 				st.subheader("Profile")
+				col = st.columns(2)
+				if col[0].checkbox("Notifications"):
+					
+					data = alerts.RetrieveNotifications(username,c)
+					if len(data[0])!=0:
+						for i in data:
+							st.success(i[0])
+
 				c.execute('SELECT password FROM userstable WHERE username = ?',(username,))
 				pass_or = c.fetchall()
 				#st.write(make_hashes(password),pass_or[0][0])
@@ -137,7 +126,7 @@ def main():
 					#st.write("Logged In as {}".format(username))
 					st.write("Account Number: {}".format(result[0][2]))
 					st.write("Balance: {}".format(result[0][3]))
-					if result[0][3]!=0:
+					if result[0][4]!=0:
 						st.write("Loan Amount: {}".format(result[0][4]))
 						st.write("Loan Time: {} Months".format(result[0][5]))
 						st.write("Loan Status: {}".format(result[0][6]))
@@ -147,9 +136,9 @@ def main():
 					st.write("\n********\n")
 					#if st.button("Edit Name"):
 					new_name = st.text_input("Enter the Name : ",value=personal_details[3])
-					
-					new_dob = st.text_input("Enter the D.O.B format(DD-MM-YYY)",value=personal_details[2])
-					
+					new_dob = str(st.text_input("Enter the D.O.B format(DD-MM-YYY)",value=personal_details[2]))
+					#d = st.date_input("Hello")
+					#st.write(str(d))
 					new_Address = st.text_input("Enter the Address : ",value=personal_details[1])
 					new_password = st.text_input("Enter the New Password : ")
 					#st.write(make_hashes(new_password))
@@ -172,8 +161,11 @@ def main():
 						c.execute('UPDATE userstable SET balance = balance + ? WHERE username = ?',(amount,username))
 						conn.commit()
 						st.success("Deposited {}".format(amount))
+						c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,amount,"CREDIT",str(time.ctime())))
+						conn.commit()
 						c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
 						data = c.fetchall()
+						alerts.InsertNotifications(username,c,"Amount of "+str(amount)+" Has been credited to your account.",conn)
 						st.write("Balance: {}".format(data[0][3]))
 					if st.sidebar.checkbox("Withdraw"):
 						amount = st.sidebar.number_input("Amount",min_value=0)
@@ -182,6 +174,9 @@ def main():
 						data = c.fetchall()
 						if data[0][3] >= amount:
 							c.execute('UPDATE userstable SET balance = balance - ? WHERE username = ?',(amount,username))
+							conn.commit()
+							alerts.InsertNotifications(username,c,"Amount of "+str(amount)+" Has been debited from your account.",conn)
+							c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,amount,"DEBIT",str(time.ctime())))
 							conn.commit()
 							st.success("Withdraw {}".format(amount))
 							c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
@@ -199,19 +194,28 @@ def main():
 						if data[0][3] >= amount:
 							c.execute('UPDATE userstable SET balance = balance - ? WHERE username = ?',(amount,username))
 							conn.commit()
+							c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,amount,"DEBIT",str(time.ctime())))
+							conn.commit()
 							c.execute('UPDATE userstable SET balance = balance + ? WHERE accountno = ?',(amount,account_number))
 							conn.commit()
+							c.execute('SELECT username FROM userstable WHERE accountno = ?',(account_number,))
+							second_username = c.fetchall()
+							c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,amount,"DEBIT",str(time.ctime())))
+							conn.commit()
+							alerts.InsertNotifications(second_username,c,"Amount of "+str(amount)+" Has been credited to your account.",conn)
+							alerts.InsertNotifications(username,c,"Amount of "+str(amount)+" Has been debited from your account.",conn)
 							st.success("Transfered {} to {}".format(amount,account_number))
 						else:
 							st.warning("Insufficient Balance")
 					# loan request
 					if st.sidebar.checkbox("Loan Request"):
 						loan_amount = st.sidebar.number_input("Loan Amount",min_value=0)
-						loan_time = st.sidebar.text_input("Loan Time")
+						loan_time = st.sidebar.text_input("Loan Time",value="6")
 						c.execute('UPDATE userstable SET loanamount = ?,loantime = ?,loanstatus = ? WHERE username = ?',(loan_amount,loan_time,"Pending",username))
 						conn.commit()
 						c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,loan_amount,"CREDIT",str(time.ctime())))
 						conn.commit()
+						alerts.InsertNotifications(username,c,"Amount of "+str(loan_amount)+" Has been credited to your account.",conn)
 						st.success("Loan Requested")
 						c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
 						data = c.fetchall()
@@ -234,11 +238,32 @@ def main():
 							st.success("Loan Paid")
 							c.execute('UPDATE userstable SET balance = balance - ? WHERE username = ?',(loan_amount,username))
 							conn.commit()
+							c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,loan_amount,"CREDIT",str(time.ctime())))
+							conn.commit()
+							alerts.InsertNotifications(username,c,"Amount of "+str(loan_amount)+" Has been debited from your account.",conn)
 							c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
 							data = c.fetchall()
 							st.write("Loan Amount: {}".format(data[0][4]))
 							st.write("Loan Time: {}".format(data[0][5]))
 							st.write("Loan Status: {}".format(data[0][6]))
+					if st.sidebar.checkbox("Money Exchange"):
+						st.sidebar.header("Currencies")
+						st.sidebar.warning("Under Construction . .")
+						if st.sidebar.button("INR->USD"):
+							dollars = st.sidebar.number_input("Enter the amount of INR you want to convert to USD:")
+							c.execute('UPDATE userstable SET balance = balance - ? WHERE username = ?', (dollars,username))
+							c.execute('UPDATE exchangetable SET USD = USD + ? WHERE username = ?',(dollars*USD,username))
+							conn.commit()
+						if st.sidebar.button("INR->EUR"):
+							euros = st.sidebar.number_input("Enter the amount of INR you want to convert to EURO:")
+							c.execute('UPDATE userstable SET balance = balance - ? WHERE username = ?', (euros,username))
+							c.execute('UPDATE exchangetable SET EURO = EURO + ? WHERE username = ?',(euros*EURO,username))
+							conn.commit()
+						if st.sidebar.button("INR->JPY"):
+							yen = st.sidebar.number_input("Enter the amount of INR you want to convert to JPY:")
+							c.execute('UPDATE userstable SET balance = balance - ? WHERE username = ?', (yen,username))
+							c.execute('UPDATE exchangetable SET JPY = JPY + ? WHERE username = ?',(yen*JPY,username))
+							conn.commit()
 						else:
 							st.warning("Insufficient Balance")
 					#print updated balance
