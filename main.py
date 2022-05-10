@@ -45,6 +45,7 @@ def create_usertable():
 	c.execute('CREATE TABLE IF NOT EXISTS aadhartable(username TEXT, aadhar INTEGER)')
 	c.execute('CREATE TABLE IF NOT EXISTS exchangetable(username TEXT,USD TEXT, EURO TEXT, JPY TEXT)')
 	c.execute('CREATE TABLE IF NOT EXISTS notificationtable(username TEXT, notifications TEXT, status TEXT,time TEXT)')
+	c.execute('CREATE TABLE IF NOT EXISTS usercomplaints(username TEXT,complaint TEXT, type TEXT,time TEXT)')
 
 def add_userdata(username,password):
 	#generate 10 len account number with mix of numbers and letters
@@ -73,7 +74,7 @@ def main():
 
 	#st.title("Erig Sicuro Bank")
 	st.image("logo.png")
-	menu = ["Home","Login","SignUp"]
+	menu = ["Login","SignUp"]
 	choice = st.sidebar.selectbox("Menu",menu)
 
 	if choice == "Home":
@@ -93,12 +94,22 @@ def main():
 				st.subheader("Profile")
 				col = st.columns(2)
 				if col[0].checkbox("Notifications"):
-					
+					st.header("Notifications")
 					alerts.RetrieveNotifications(username,c,conn)
 					#if len(data[0])!=0:
 					#	for i in data:
 					#		st.success(i[0])
-
+				if col[1].checkbox("Complaint/Review"):
+					st.header("Complaint & Review Section\n")
+					opt = ["Review","Complaint"]
+					p = st.selectbox("Select the message type: ",opt)
+					complaint = st.text_input("Enter the Complaint/Message")
+					if st.button("Submit"):
+						if len(complaint) > 2:
+							Admin.SendComplaint(complaint,username,p,c,conn)
+							st.success(p+" submitted.")
+						else:
+							st.error("Submission Failed")
 				c.execute('SELECT password FROM userstable WHERE username = ?',(username,))
 				pass_or = c.fetchall()
 				#st.write(make_hashes(password),pass_or[0][0])

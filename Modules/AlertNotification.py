@@ -15,7 +15,7 @@ def RetrieveNotifications(username, c,conn):
                 if cols[1].checkbox("Mark Message "+str(count+1)+" as Read"):
                     c.execute("UPDATE notificationtable SET status = ? WHERE time = ? AND username = ?",("Read",i[2],username))
                     conn.commit()
-                
+        
             else:
                 cols = st.columns(3)
                 cols[0].warning(i[0])

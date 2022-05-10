@@ -1,4 +1,5 @@
 import streamlit as st
+import time
 def AdminControl(c,conn):
 	st.header("Admin Page")
 	c.execute('SELECT * FROM userstable')
@@ -6,6 +7,20 @@ def AdminControl(c,conn):
 	c.execute('SELECT * FROM transactionstable')
 	transaction_data = c.fetchall()
 	#st.write(admin_data)
+	opt2 = ["Review","Complaint"]
+	st.header("Complaints & Reviews")
+	opt3 = ["None"]
+	c.execute('SELECT DISTINCT username FROM userstable') 
+	usernames = c.fetchall()
+	#st.write(usernames)
+	for x in usernames:
+		opt3.append(x[0])
+	res2 = st.selectbox("Select a user",opt3)
+	if res2!="None":
+		user_complaints = RetrieveInfo(c,conn,res2)
+		for i in range(len(user_complaints)):
+			st.info(str(i+1)+". "+user_complaints[i][1])
+		#st.write(user_complaints)
 	for i in range(len(admin_data)):
 		transac = []
 		for x in transaction_data:
@@ -30,3 +45,13 @@ def AdminControl(c,conn):
 			st.write("\n\n#-#-#-\n\n")
 		
 		st.write("\n*************\n")
+
+
+def SendComplaint(complaint,username,type,c,conn):
+    c.execute('INSERT INTO usercomplaints VALUES (?,?,?,?)',(username,complaint,type,str(time.time())))
+    conn.commit()
+
+def RetrieveInfo(c,conn,username):
+	c.execute('SELECT * FROM usercomplaints WHERE username = ?',(username,))
+	complaint_data = c.fetchall()
+	return complaint_data
