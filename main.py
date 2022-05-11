@@ -11,6 +11,7 @@ import numpy as np
 import time
 import Modules.AlertNotification as alerts
 import Modules.Admin as Admin
+import Modules.Transactions as transac
 MONTH_TIME = 60*60*24*30
 USD = 0.013
 JPY = 1.673
@@ -46,6 +47,7 @@ def create_usertable():
 	c.execute('CREATE TABLE IF NOT EXISTS exchangetable(username TEXT,USD TEXT, EURO TEXT, JPY TEXT)')
 	c.execute('CREATE TABLE IF NOT EXISTS notificationtable(username TEXT, notifications TEXT, status TEXT,time TEXT)')
 	c.execute('CREATE TABLE IF NOT EXISTS usercomplaints(username TEXT,complaint TEXT, type TEXT,time TEXT)')
+	c.execute('CREATE TABLE IF NOT EXISTS userpayeetable(username TEXT,payee_accno TEXT)')
 
 def add_userdata(username,password):
 	#generate 10 len account number with mix of numbers and letters
@@ -173,59 +175,20 @@ def main():
 						st.sidebar.header("Transaction Options")
 						if st.sidebar.checkbox("Deposit"):
 							amount = st.sidebar.number_input("Amount",min_value=0)
-							c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
-							data = c.fetchall()
-							if amount>0:
-								c.execute('UPDATE userstable SET balance = balance + ? WHERE username = ?',(amount,username))
-								conn.commit()
-								st.success("Deposited {}".format(amount))
-								c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,amount,"CREDIT",str(time.ctime())))
-								conn.commit()
-								c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
-								data = c.fetchall()
-								alerts.InsertNotifications(username,c,"Amount of "+str(amount)+" Has been credited to your account.",conn)
-							st.write("Balance: {}".format(data[0][3]))
+							transac.DepositTransaction(username,amount,c,conn)
+
 						if st.sidebar.checkbox("Withdraw"):
 							amount = st.sidebar.number_input("Amount",min_value=0)
 							# check wether sufficient balance is there or not
-							c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
-							data = c.fetchall()
-							if data[0][3] >= amount:
-								if amount > 0:
-									c.execute('UPDATE userstable SET balance = balance - ? WHERE username = ?',(amount,username))
-									conn.commit()
-									alerts.InsertNotifications(username,c,"Amount of "+str(amount)+" Has been debited from your account.",conn)
-									c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,amount,"DEBIT",str(time.ctime())))
-									conn.commit()
-									st.success("Withdraw {}".format(amount))
-									c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
-									data = c.fetchall()
-								st.write("Balance: {}".format(data[0][3]))
-							else:
-								st.warning("Insufficient Balance")
+							transac.WithdrawTransaction(username,amount,c,conn)
+
 						# transfer money to other user
 						if st.sidebar.checkbox("Transfer"):
 							account_number = st.sidebar.text_input("Account Number")
 							amount = st.sidebar.number_input("Amount",min_value=0)
 							# check wether sufficient balance is there or not
-							c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
-							data = c.fetchall()
-							if data[0][3] >= amount and amount > 0:
-								c.execute('UPDATE userstable SET balance = balance - ? WHERE username = ?',(amount,username))
-								conn.commit()
-								c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,amount,"DEBIT",str(time.ctime())))
-								conn.commit()
-								c.execute('UPDATE userstable SET balance = balance + ? WHERE accountno = ?',(amount,account_number))
-								conn.commit()
-								c.execute('SELECT username FROM userstable WHERE accountno = ?',(account_number,))
-								second_username = c.fetchall()
-								c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,amount,"DEBIT",str(time.ctime())))
-								conn.commit()
-								alerts.InsertNotifications(second_username,c,"Amount of "+str(amount)+" Has been credited to your account.",conn)
-								alerts.InsertNotifications(username,c,"Amount of "+str(amount)+" Has been debited from your account.",conn)
-								st.success("Transfered {} to {}".format(amount,account_number))
-							else:
-								st.warning("Transaction Error . .")
+							transac.MoneyTransfer(username,account_number,amount,c,conn)
+
 					# loan request
 					if option=="Loans":
 						st.sidebar.header("Loan Options")

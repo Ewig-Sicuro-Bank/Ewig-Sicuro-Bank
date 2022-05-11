@@ -16,8 +16,9 @@ def AdminControl(c,conn):
 	for x in usernames:
 		opt3.append(x[0])
 	res2 = st.selectbox("Select a user",opt3)
+	res3 = st.selectbox("Select the type of message",opt2)
 	if res2!="None":
-		user_complaints = RetrieveInfo(c,conn,res2)
+		user_complaints = RetrieveInfo(c,conn,res2,res3)
 		for i in range(len(user_complaints)):
 			st.info(str(i+1)+". "+user_complaints[i][1])
 		#st.write(user_complaints)
@@ -51,7 +52,7 @@ def SendComplaint(complaint,username,type,c,conn):
     c.execute('INSERT INTO usercomplaints VALUES (?,?,?,?)',(username,complaint,type,str(time.time())))
     conn.commit()
 
-def RetrieveInfo(c,conn,username):
-	c.execute('SELECT * FROM usercomplaints WHERE username = ?',(username,))
+def RetrieveInfo(c,conn,username,type_):
+	c.execute('SELECT * FROM usercomplaints WHERE username = ? AND type = ?',(username,type_))
 	complaint_data = c.fetchall()
 	return complaint_data
