@@ -12,6 +12,7 @@ import time
 import Modules.AlertNotification as alerts
 import Modules.Admin as Admin
 import Modules.Transactions as transac
+import random
 MONTH_TIME = 60*60*24*30
 USD = 0.013
 JPY = 1.673
@@ -38,6 +39,12 @@ def check_hashes(password,hashed_text):
 		return hashed_text
 	return False
 
+def randomnumber(N):
+	minimum = pow(10, N-1)
+	maximum = pow(10, N) - 1
+	return random.randint(minimum, maximum)
+
+
 # DB  Functions
 def create_usertable():
 	c.execute('CREATE TABLE IF NOT EXISTS userstable(username TEXT,password TEXT,accountno TEXT,balance INTEGER,loanamount INTEGER,loantime TEXT,loanstatus TEXT)')
@@ -48,6 +55,8 @@ def create_usertable():
 	c.execute('CREATE TABLE IF NOT EXISTS notificationtable(username TEXT, notifications TEXT, status TEXT,time TEXT)')
 	c.execute('CREATE TABLE IF NOT EXISTS usercomplaints(username TEXT,complaint TEXT, type TEXT,time TEXT)')
 	c.execute('CREATE TABLE IF NOT EXISTS userpayeetable(username TEXT, payee_name TEXT, payee_bank TEXT, payee_branch TEXT, payee_accno TEXT)')
+	c.execute('CREATE TABLE IF NOT EXISTS checkingacctable(username TEXT, cardno INTEGER, balance INTEGER, last_payment TEXT, duedate TEXT)')
+
 
 def add_userdata(username,password):
 	#generate 10 len account number with mix of numbers and letters
@@ -56,6 +65,7 @@ def add_userdata(username,password):
 	conn.commit()
 	c.execute('INSERT INTO personaltable VALUES(?,?,?,?)',(username,"","",username))
 	c.execute('INSERT INTO aadhartable VALUES(?,?)',(username,0))
+	c.execute('INSERT INTO checkingacctable VALUES(?,?,?,?,?)',(username,randomnumber(10),0,"None","None"))
 	alerts.InsertNotifications(username,c,"Hello "+username+", Welcome to Ewig Sicuro Bank.",conn)
 	conn.commit()
 
@@ -194,14 +204,16 @@ def main():
 					option = st.sidebar.radio(" ",("Transactions","Loans","Exchange"))
 					if option=="Transactions":
 						st.sidebar.header("Transaction Options")
+						opt7 = ["Savings","Checking"]
+						res7 = st.sidebar.selectbox("Select Account Type",opt7)
 						if st.sidebar.checkbox("Deposit"):
 							amount = st.sidebar.number_input("Amount",min_value=0)
-							transac.DepositTransaction(username,amount,c,conn)
+							transac.DepositTransaction(username,amount,c,conn,res7)
 
 						if st.sidebar.checkbox("Withdraw"):
 							amount = st.sidebar.number_input("Amount",min_value=0)
 							# check wether sufficient balance is there or not
-							transac.WithdrawTransaction(username,amount,c,conn)
+							transac.WithdrawTransaction(username,amount,c,conn,res7)
 
 						# transfer money to other user
 						if st.sidebar.checkbox("Transfer"):
@@ -250,6 +262,17 @@ def main():
 									c.execute('DELETE FROM userpayeetable WHERE payee_name = ?',(rem_payee,))
 									conn.commit()
 									st.write("Deletion Done . .")
+						if st.sidebar.checkbox("Credit Card Status"):
+							st.header("Credit Card Details")
+							c.execute('SELECT * FROM checkingacctable WHERE username = ?',(username,))
+							data7 = c.fetchall()
+							#st.write(data7)
+							data7 = data7[0]
+							st.write("Credit Card Number: "+str(data7[1]))
+							st.write("Balance: "+str(data7[2]))
+							st.write("Last Payment: ",data7[3])
+							st.write("Due Date: ",data7[4])
+							st.write("\n***\n")
 
 					# loan request
 					if option=="Loans":
