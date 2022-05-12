@@ -201,7 +201,7 @@ def main():
 							st.warning("User details won't be saved without entering the Aadhar Number !")
 					# deposit and withdraw buttons
 					st.sidebar.header("Menu")
-					option = st.sidebar.radio(" ",("Transactions","Loans","Exchange"))
+					option = st.sidebar.radio(" ",("Transactions","Loans")) #Exchange Under Construction
 					if option=="Transactions":
 						st.sidebar.header("Transaction Options")
 						opt7 = ["Savings","Checking"]
@@ -281,6 +281,8 @@ def main():
 							loan_amount = st.sidebar.number_input("Loan Amount",min_value=0)
 							loan_time = st.sidebar.text_input("Loan Time",value="6")
 							if loan_amount > 0:
+								c.execute('UPDATE userstable SET balance = balance + ? WHERE username = ?',(loan_amount,username))
+								conn.commit()
 								c.execute('UPDATE userstable SET loanamount = ?,loantime = ?,loanstatus = ? WHERE username = ?',(loan_amount,loan_time,"Pending",username))
 								conn.commit()
 								c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,loan_amount,"CREDIT",str(time.ctime())))
