@@ -47,7 +47,7 @@ def create_usertable():
 	c.execute('CREATE TABLE IF NOT EXISTS exchangetable(username TEXT,USD TEXT, EURO TEXT, JPY TEXT)')
 	c.execute('CREATE TABLE IF NOT EXISTS notificationtable(username TEXT, notifications TEXT, status TEXT,time TEXT)')
 	c.execute('CREATE TABLE IF NOT EXISTS usercomplaints(username TEXT,complaint TEXT, type TEXT,time TEXT)')
-	c.execute('CREATE TABLE IF NOT EXISTS userpayeetable(username TEXT,payee_accno TEXT)')
+	c.execute('CREATE TABLE IF NOT EXISTS userpayeetable(username TEXT, payee_name TEXT, payee_bank TEXT, payee_branch TEXT, payee_accno TEXT)')
 
 def add_userdata(username,password):
 	#generate 10 len account number with mix of numbers and letters
@@ -69,6 +69,9 @@ def view_all_users():
 	c.execute('SELECT * FROM userstable')
 	data = c.fetchall()
 	return data
+
+def CheckData(a,b,c,d):
+	return len(a)>0 and len(b) > 0 and len(c) > 0 and len(d) > 0
 
 
 def main():
@@ -94,7 +97,7 @@ def main():
 				Admin.AdminControl(c,conn)
 			else:
 				st.subheader("Profile")
-				col = st.columns(2)
+				col = st.columns(4)
 				if col[0].checkbox("Notifications"):
 					st.header("Notifications")
 					alerts.RetrieveNotifications(username,c,conn)
@@ -112,6 +115,23 @@ def main():
 							st.success(p+" submitted.")
 						else:
 							st.error("Submission Failed")
+				if col[2].checkbox("Transaction History"):
+					st.header("Transaction History: "+username)
+					options = ["All","Last 10 Transactions","Last 5 transactions","Last Transaction"]
+					transac_opt = st.selectbox("Select an Option",options)
+					c.execute('SELECT * FROM transactionstable WHERE username = ?',(username,))
+					trans_opt_res = c.fetchall()
+					switch_opt = {options[0]:1000000000,options[1]:10,options[2]:5,options[3]:1}
+					trans_opt_res = trans_opt_res[::-1]
+					trans_opt_res = trans_opt_res[:min(len(trans_opt_res),switch_opt[transac_opt])]
+					#st.write(trans_opt_res)
+					for e in trans_opt_res:
+						st.write("\n****\n")
+						st.write("Date & Time: "+e[3])
+						st.write("Amount: "+str(e[1]))
+						st.write("Transaction Type: "+e[2])
+						st.write("\n******\n")
+
 				c.execute('SELECT password FROM userstable WHERE username = ?',(username,))
 				pass_or = c.fetchall()
 				#st.write(make_hashes(password),pass_or[0][0])
@@ -148,26 +168,27 @@ def main():
 					if st.button("More Details . ."):
 						st.write("Under Construction")
 					st.write("\n********\n")
-					#if st.button("Edit Name"):
-					new_name = st.text_input("Enter the Name : ",value=personal_details[3])
-					new_dob = str(st.text_input("Enter the D.O.B format(DD-MM-YYY)",value=personal_details[2]))
-					#d = st.date_input("Hello")
-					#st.write(str(d))
-					new_Address = st.text_input("Enter the Address : ",value=personal_details[1])
-					new_password = st.text_input("Enter the New Password : ")
-					#st.write(make_hashes(new_password))
-					aadhar_number = st.number_input("Enter your Aadhar Number as  proof for these changes",min_value=0,value=0)
-					if aadhar_number!=0:
-						c.execute('UPDATE aadhartable SET aadhar = ? WHERE username = ?',(aadhar_number,username))
-						c.execute('UPDATE personaltable SET name = ? WHERE username = ?',(new_name,username))
-						c.execute('UPDATE personaltable SET dob = ? WHERE username = ?',(new_dob,username))
-						c.execute('UPDATE personaltable SET address = ? WHERE username = ?',(new_Address,username))
-						#time.sleep(10)
-						if len(new_password)>0:
-							c.execute('UPDATE userstable SET password = ? WHERE username = ?',(make_hashes(new_password),username))
-						conn.commit()
-					else:
-						st.warning("User details won't be saved without entering the Aadhar Number !")
+					if col[3].checkbox("Edit Personal Details"):
+						st.header("Edit Details: ")
+						new_name = st.text_input("Enter the Name : ",value=personal_details[3])
+						new_dob = str(st.text_input("Enter the D.O.B format(DD-MM-YYY)",value=personal_details[2]))
+						#d = st.date_input("Hello")
+						#st.write(str(d))
+						new_Address = st.text_input("Enter the Address : ",value=personal_details[1])
+						new_password = st.text_input("Enter the New Password : ")
+						#st.write(make_hashes(new_password))
+						aadhar_number = st.number_input("Enter your Aadhar Number as  proof for these changes",min_value=0,value=0)
+						if aadhar_number!=0:
+							c.execute('UPDATE aadhartable SET aadhar = ? WHERE username = ?',(aadhar_number,username))
+							c.execute('UPDATE personaltable SET name = ? WHERE username = ?',(new_name,username))
+							c.execute('UPDATE personaltable SET dob = ? WHERE username = ?',(new_dob,username))
+							c.execute('UPDATE personaltable SET address = ? WHERE username = ?',(new_Address,username))
+							#time.sleep(10)
+							if len(new_password)>0:
+								c.execute('UPDATE userstable SET password = ? WHERE username = ?',(make_hashes(new_password),username))
+							conn.commit()
+						else:
+							st.warning("User details won't be saved without entering the Aadhar Number !")
 					# deposit and withdraw buttons
 					st.sidebar.header("Menu")
 					option = st.sidebar.radio(" ",("Transactions","Loans","Exchange"))
@@ -184,10 +205,51 @@ def main():
 
 						# transfer money to other user
 						if st.sidebar.checkbox("Transfer"):
-							account_number = st.sidebar.text_input("Account Number")
-							amount = st.sidebar.number_input("Amount",min_value=0)
+							payee_options = ["None"]
+							c.execute('SELECT * FROM userpayeetable WHERE username = ?',(username,))
+							data6 = c.fetchall()
+							#st.write(data6)
+							for z in data6:
+								payee_options.append(z[1])
+							st.header("Money Transfer")
+							payee_opt_res = st.selectbox("Select a Payee",payee_options)
+							account_number = None
+							amount = st.number_input("Amount",min_value=0)
+							for b in data6:
+								if b[1]==payee_opt_res:
+									account_number = b[4]
+
 							# check wether sufficient balance is there or not
-							transac.MoneyTransfer(username,account_number,amount,c,conn)
+							if payee_opt_res!="None":
+								transac.MoneyTransfer(username,account_number,amount,c,conn)
+							st.write("\n*****\n")
+							st.subheader("Add a Payee")
+							add_payee_name = st.text_input("Enter Name: ")
+							add_payee_bank = st.text_input("Enter Bank Name: ")
+							add_payee_branch = st.text_input("Enter Branch Name: ")
+							ad_payee_account_no = st.text_input("Enter Account Number")
+							if st.button("Add Payee") :
+								if CheckData(add_payee_name,add_payee_bank,add_payee_branch,ad_payee_account_no):
+									c.execute('SELECT * FROM userstable WHERE accountno = ?',(ad_payee_account_no,))
+									data5 = c.fetchall()
+
+									if(len(data5)==1):
+										c.execute('INSERT INTO userpayeetable VALUES(?,?,?,?,?)',(username,add_payee_name,add_payee_bank,add_payee_branch,ad_payee_account_no))
+										conn.commit()
+										
+									else:
+										st.warning("Account Not Found . .")
+								else:
+									st.warning("Data Input Error . .")
+							st.write("\n****\n")
+							st.subheader("Remove a Payee")
+							rem_payee = st.selectbox("Select a payee to remove",payee_options)
+							if st.button("Remove Payee"):
+								if rem_payee!="None":
+									#payee_options.remove(rem_payee)
+									c.execute('DELETE FROM userpayeetable WHERE payee_name = ?',(rem_payee,))
+									conn.commit()
+									st.write("Deletion Done . .")
 
 					# loan request
 					if option=="Loans":

@@ -35,22 +35,23 @@ def WithdrawTransaction(username,amount,c,conn):
 def MoneyTransfer(username,account_number,amount,c,conn):
 							c.execute('SELECT * FROM userstable WHERE username = ?',(username,))
 							data = c.fetchall()
-							if data[0][3] >= amount and amount > 0:
-								c.execute('UPDATE userstable SET balance = balance - ? WHERE username = ?',(amount,username))
-								conn.commit()
-								c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,amount,"DEBIT",str(time.ctime())))
-								conn.commit()
-								c.execute('UPDATE userstable SET balance = balance + ? WHERE accountno = ?',(amount,account_number))
-								conn.commit()
-								c.execute('SELECT username FROM userstable WHERE accountno = ?',(account_number,))
-								second_username = c.fetchall()
-								if len(second_username)>0:
+							if st.button("Pay Now"):
+								if data[0][3] >= amount and amount > 0:
+									c.execute('UPDATE userstable SET balance = balance - ? WHERE username = ?',(amount,username))
+									conn.commit()
 									c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,amount,"DEBIT",str(time.ctime())))
 									conn.commit()
-									alerts.InsertNotifications(second_username[0],c,"Amount of "+str(amount)+" Has been credited to your account.",conn)
-									alerts.InsertNotifications(username,c,"Amount of "+str(amount)+" Has been debited from your account.",conn)
-									st.success("Transfered {} to {}".format(amount,account_number))
+									c.execute('UPDATE userstable SET balance = balance + ? WHERE accountno = ?',(amount,account_number))
+									conn.commit()
+									c.execute('SELECT username FROM userstable WHERE accountno = ?',(account_number,))
+									second_username = c.fetchall()
+									if len(second_username)>0:
+										c.execute('INSERT INTO transactionstable VALUES(?,?,?,?)',(username,amount,"DEBIT",str(time.ctime())))
+										conn.commit()
+										alerts.InsertNotifications(second_username[0][0],c,"Amount of "+str(amount)+" Has been credited to your account.",conn)
+										alerts.InsertNotifications(username,c,"Amount of "+str(amount)+" Has been debited from your account.",conn)
+										st.success("Transfered {} to {}".format(amount,account_number))
+									else:
+										st.warning("Transaction Error . . ")
 								else:
-									st.warning("Transaction Error . .")
-							else:
-								st.warning("Transaction Error . .")
+									st.warning("Transaction Error . . ")

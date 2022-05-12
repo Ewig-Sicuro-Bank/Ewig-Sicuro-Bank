@@ -30,6 +30,7 @@ def RetrieveNotifications(username, c,conn):
 def InsertNotifications(username, c, notification, conn):
     if len(notification)==0:
         return
+    #st.write(username[0],notification)
     c.execute('INSERT INTO notificationtable VALUES(?,?,?,?)',(username,notification,"Unread",str(time.time())))
     conn.commit()
 
