@@ -175,8 +175,8 @@ def main():
 						st.write("Loan Time: {} Months".format(result[0][5]))
 						st.write("Loan Status: {}".format(result[0][6]))
 					st.write("\n\n")
-					if st.button("More Details . ."):
-						st.write("Under Construction")
+					#if st.button("More Details . ."):
+					#	st.write("Under Construction")
 					st.write("\n********\n")
 					if col[3].checkbox("Edit Personal Details"):
 						st.header("Edit Details: ")
